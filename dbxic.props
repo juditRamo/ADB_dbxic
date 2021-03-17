@@ -1,0 +1,6 @@
+# DBxic's database directory
+dbxic.base.dir=/C:/Users/judit/Documents/UB/_42_BASES_DE_DADES_AVANCADES/PRACTICAL/lab2/dbxic/db
+# DBxic's temporary files directory
+dbxic.temp.dir=/C:/Users/judit/Documents/UB/_42_BASES_DE_DADES_AVANCADES/PRACTICAL/lab2/dbxic/db/tmp
+# The number of blocks in the buffer
+dbxic.buffersize=50

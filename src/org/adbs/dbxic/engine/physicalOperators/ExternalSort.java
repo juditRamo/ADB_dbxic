@@ -132,6 +132,38 @@ public class ExternalSort extends UnaryOperator {
             }
             int num_blocks = FileHandling.getNumberOfBlocks(inputFileName);
 
+            int num_blocksPerRun = num_blocks / num_runs;
+
+            int currentInputBlock = 0;
+
+            for (int r = 0; r < num_runs; r++) {
+
+                // option 1
+                ArrayList runTuples = new ArrayList<Tuple>();
+                for (int i = currentInputBlock; i < currentInputBlock + num_blocksPerRun; i++){
+                    Block block = sm.readBlock(inRelation, inputFileName, i);
+                    // get tuples from block
+                    for (Tuple currentTuple : block) {
+                        sm.insertTupleInPosition(inRelation, runTempFiles[r], currentTuple, findPosition(inRelation, runTempFiles[r], currentTuple));
+                    }
+
+                }
+
+                // option 2
+                Iterator<Tuple> tuples = null;
+                try {
+                    tuples = sm.tuples(inRelation, inputFileName).iterator();
+                } catch (IOException e) {
+                    throw new DBxicException("Error: Could not access tuples from relation.", e);
+                }
+                while (tuples.hasNext()) {
+                    Tuple currentTuple = tuples.next();
+                    sm.insertTupleInPosition(inRelation, runTempFiles[r], currentTuple, findPosition(inRelation, runTempFiles[r], currentTuple));
+                }
+
+                // guardar ordenados en file runTempFiles[r]
+                currentInputBlock = currentInputBlock + num_blocksPerRun;
+            }
 
 
             /////////////////////////////////////////////////////////
@@ -142,6 +174,7 @@ public class ExternalSort extends UnaryOperator {
             /////////////////////////////////////////////////////////
 
             // how many blocks per run?
+            // num_blocks / num_runs
 
             // create relations for runs
 

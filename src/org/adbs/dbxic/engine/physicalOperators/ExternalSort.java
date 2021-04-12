@@ -132,43 +132,9 @@ public class ExternalSort extends UnaryOperator {
             }
             int num_blocks = FileHandling.getNumberOfBlocks(inputFileName);
 
-            int num_blocksPerRun = num_blocks / num_runs;
-
-            int currentInputBlock = 0;
-
-            for (int r = 0; r < num_runs; r++) {
-
-                // option 1
-                ArrayList runTuples = new ArrayList<Tuple>();
-                for (int i = currentInputBlock; i < currentInputBlock + num_blocksPerRun; i++){
-                    Block block = sm.readBlock(inRelation, inputFileName, i);
-                    // get tuples from block
-                    for (Tuple currentTuple : block) {
-                        sm.insertTupleInPosition(inRelation, runTempFiles[r], currentTuple, findPosition(inRelation, runTempFiles[r], currentTuple));
-                    }
-
-                }
-
-                // option 2
-                Iterator<Tuple> tuples = null;
-                try {
-                    tuples = sm.tuples(inRelation, inputFileName).iterator();
-                } catch (IOException e) {
-                    throw new DBxicException("Error: Could not access tuples from relation.", e);
-                }
-                while (tuples.hasNext()) {
-                    Tuple currentTuple = tuples.next();
-                    sm.insertTupleInPosition(inRelation, runTempFiles[r], currentTuple, findPosition(inRelation, runTempFiles[r], currentTuple));
-                }
-
-                // guardar ordenados en file runTempFiles[r]
-                currentInputBlock = currentInputBlock + num_blocksPerRun;
-            }
-
-
             /////////////////////////////////////////////////////////
             //
-            // TODO: ExternalSort: YOUR CODE GOES HERE
+            // TODO: ExternalSort: DONE
             // Save the whole input relation into runs. Take advantage of the moment for creating ordered runs.
             //
             /////////////////////////////////////////////////////////
@@ -179,6 +145,26 @@ public class ExternalSort extends UnaryOperator {
             // create relations for runs
 
             // insert tuples in runs in specific positions (ordered)
+
+            int num_blocksPerRun = num_blocks / num_runs;
+
+            Iterator<Block> blocks = null;
+            try {
+                blocks = sm.blocks(inRelation, inputFileName).iterator();
+            } catch (IOException e) {
+                throw new DBxicException("Error: Could not access blocks from relation.", e);
+            }
+
+            for (int r = 0; r < num_runs; r++) {
+                int num_BlocksInThisRun = 0;
+                while (blocks.hasNext() && num_BlocksInThisRun < num_blocksPerRun) {
+                    Block currentBlock = blocks.next();
+                    for (Tuple currentTuple : currentBlock) {
+                        sm.insertTupleInPosition(inRelation, runTempFiles[r], currentTuple, findPosition(inRelation, runTempFiles[r], currentTuple));
+                    }
+                    num_BlocksInThisRun++;
+                }
+            }
             
             /////////////////////////////////////////////////////////
             //
@@ -189,6 +175,96 @@ public class ExternalSort extends UnaryOperator {
 
             // read tuples from set of runs and insert them in output relation
 
+            /*
+            BufferManager outputBuffer = new BufferManager(1);
+            BufferManager[] inputBuffers = new BufferManager[num_runs];
+            int[] blockIdInRunFile = new int[num_runs];
+            int[] tupleIdInBlockInRunFile = new int[num_runs];
+
+            for (int r = 0; r < num_runs; r++) {
+                inputBuffers[r] = new BufferManager(1);
+                inputBuffers[r].putBlock(sm.readBlock(inRelation, runTempFiles[r], 0), false);
+                blockIdInRunFile[r] = 0;
+                tupleIdInBlockInRunFile[r] = 0;
+            }
+
+            boolean allBuffersEmpty = false;
+            while (!allBuffersEmpty){
+                Tuple currentTuple = null;
+                int r = 0;
+                int i = 0;
+                while (r < num_runs){
+                    Tuple newTuple  = inputBuffers[r].getBlock(runTempFiles[r], blockIdInRunFile[r]).getTuple(tupleIdInBlockInRunFile[r]);
+                    if (currentTuple == null || compareTuples(currentTuple, newTuple) > 0) {
+                        currentTuple = newTuple;
+                        i = r;
+                    }
+                    r++;
+                }
+                Block outputBlock = outputBuffer.getBlock(runTempFiles[i], 0);
+                if (outputBlock.hasRoomFor(currentTuple)){
+                    outputBlock.addTuple(currentTuple);
+                } else {
+                    for (Tuple t : outputBlock.iterator())
+                    sm.writeBlock(outputBlock);
+                    ou
+                    outputBlock.addTuple(currentTuple);
+                }
+                outputBuffer.putBlock(outputBlock);
+
+            }*/
+            Block outputBuffer = new Block(inRelation, outputFileName, 0);
+            Block[] inputBuffers = new Block[num_runs];
+            int[] blockIdInRunFile = new int[num_runs];
+            int[] tupleIdInBlockInRunFile = new int[num_runs];
+            int outputLasBlock = 0;
+
+            for (int r = 0; r < num_runs; r++) {
+                try {
+                    inputBuffers[r] = sm.readBlock(inRelation, runTempFiles[r], 0);
+                    blockIdInRunFile[r] = 0;
+                    tupleIdInBlockInRunFile[r] = 0;
+                } catch (DBxicException e) {
+                    blockIdInRunFile[r] = -1;
+                    tupleIdInBlockInRunFile[r] = -1;
+                    throw e;
+                }
+            }
+
+            boolean allBuffersEmpty = false;
+            while (!allBuffersEmpty){
+                // 3.1
+                Tuple currentTuple = null;
+                int r = 0;
+                int i = 0;
+                while (r < num_runs){
+                    Tuple newTuple  = inputBuffers[r].getTuple(tupleIdInBlockInRunFile[r]);
+                    if (currentTuple == null || compareTuples(currentTuple, newTuple) > 0) {
+                        currentTuple = newTuple;
+                        i = r;
+                    }
+                    r++;
+                }
+                // 3.2
+                //inputBuffers[i].tuples.remove(t);
+                // 3.3
+                if (!outputBuffer.hasRoomFor(currentTuple)) {
+                    for (Tuple t : outputBuffer) {
+                        sm.insertTuple(inRelation, outputFileName, t);
+                    }
+                    /*RandomAccessFile raf = new RandomAccessFile(outputFileName, FileHandling.READ_WRITE);
+                    BlockIOManager.writeBlock(raf, outputBuffer);
+                    raf.close();*/
+                    outputLasBlock++;
+                    outputBuffer = new Block(inRelation, outputFileName, outputLasBlock);
+                }
+                outputBuffer.addTuple(currentTuple);
+
+                // 3.4
+                /*if (inputBuffers[i].isEmpty()){
+                    inputBuffers[i] = sm.readBlock(inRelation, runTempFiles[r], blockIdInRunFile[i]);
+                }*/
+            }
 
             outputTuples = sm.tuples(getOutputRelation(), outputFileName).iterator();
         }

@@ -76,13 +76,13 @@ public class InflateRelation {
 
         PrintStream outStream = System.out; //new PrintStream(outputStream);
 
-        String tablename = "teacher";
+        /*String tablename = "teacher";
         int num_tuples=50;
         ArrayList<Pair<String,String>> lAttrs = new ArrayList<>();
         lAttrs.add(new Pair<>("name","string"));
         lAttrs.add(new Pair<>("phd_year","integer"));
         lAttrs.add(new Pair<>("department_id","limit_0_15")); // from 0 to 14 (right is exclusive)*/
-        /*String tablename = "student";
+        String tablename = "student";
         int num_tuples=1000;
         ArrayList<Pair<String,String>> lAttrs = new ArrayList<>();
         lAttrs.add(new Pair<>("name","string"));
@@ -92,7 +92,7 @@ public class InflateRelation {
         int num_tuples=15;
         ArrayList<Pair<String,String>> lAttrs = new ArrayList<>();
         lAttrs.add(new Pair<>("name","string"));
-        lAttrs.add(new Pair<>("place","string"));*/
+        lAttrs.add(new Pair<>("place","string"));//*/
         try {
             irgen = new InflateRelation(tablename, lAttrs);
             irgen.generate(num_tuples, outStream);

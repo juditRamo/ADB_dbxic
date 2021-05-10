@@ -139,15 +139,16 @@ public class ExternalSort extends UnaryOperator {
             //
             /////////////////////////////////////////////////////////
 
+
             // how many blocks per run?
-            // num_blocks / num_runs
+            int num_blocksPerRun = 1;
+            if (num_blocks > num_runs) {
+                num_blocksPerRun = num_blocks / num_runs;
+            }
+            // num of runs that will have one block more
+            int numRunsBlockExtra = num_blocks % num_runs;
 
-            // create relations for runs
-
-            // insert tuples in runs in specific positions (ordered)
-
-            int num_blocksPerRun = num_blocks / num_runs;
-
+            // create iterator for input blocks
             Iterator<Block> blocks = null;
             try {
                 blocks = sm.blocks(inRelation, inputFileName).iterator();
@@ -155,12 +156,22 @@ public class ExternalSort extends UnaryOperator {
                 throw new DBxicException("Error: Could not access blocks from relation.", e);
             }
 
+            // create relations for runs
+            Relation[] runTempRelations = new Relation[num_runs];
+
+            // insert tuples in runs in specific positions (ordered)
             for (int r = 0; r < num_runs; r++) {
                 int num_BlocksInThisRun = 0;
+                // first blocks will have one block more
+                if (r < numRunsBlockExtra) {
+                    num_BlocksInThisRun = -1;
+                }
+                runTempRelations[r] = new Relation(inRelation);
                 while (blocks.hasNext() && num_BlocksInThisRun < num_blocksPerRun) {
                     Block currentBlock = blocks.next();
                     for (Tuple currentTuple : currentBlock) {
-                        sm.insertTupleInPosition(inRelation, runTempFiles[r], currentTuple, findPosition(inRelation, runTempFiles[r], currentTuple));
+                        sm.insertTupleInPosition(runTempRelations[r], runTempFiles[r], currentTuple,
+                                findPosition(runTempRelations[r], runTempFiles[r], currentTuple));
                     }
                     num_BlocksInThisRun++;
                 }
@@ -168,102 +179,16 @@ public class ExternalSort extends UnaryOperator {
             
             /////////////////////////////////////////////////////////
             //
-            // TODO: ExternalSort: YOUR CODE GOES HERE
+            // TODO: ExternalSort: DONE
             // Save the output ordered in the output file so that we can use later and iterator
             //
             /////////////////////////////////////////////////////////
 
             // read tuples from set of runs and insert them in output relation
 
-            /*
-            BufferManager outputBuffer = new BufferManager(1);
-            BufferManager[] inputBuffers = new BufferManager[num_runs];
-            int[] blockIdInRunFile = new int[num_runs];
-            int[] tupleIdInBlockInRunFile = new int[num_runs];
-
-            for (int r = 0; r < num_runs; r++) {
-                inputBuffers[r] = new BufferManager(1);
-                inputBuffers[r].putBlock(sm.readBlock(inRelation, runTempFiles[r], 0), false);
-                blockIdInRunFile[r] = 0;
-                tupleIdInBlockInRunFile[r] = 0;
-            }
-
-            boolean allBuffersEmpty = false;
-            while (!allBuffersEmpty){
-                Tuple currentTuple = null;
-                int r = 0;
-                int i = 0;
-                while (r < num_runs){
-                    Tuple newTuple  = inputBuffers[r].getBlock(runTempFiles[r], blockIdInRunFile[r]).getTuple(tupleIdInBlockInRunFile[r]);
-                    if (currentTuple == null || compareTuples(currentTuple, newTuple) > 0) {
-                        currentTuple = newTuple;
-                        i = r;
-                    }
-                    r++;
-                }
-                Block outputBlock = outputBuffer.getBlock(runTempFiles[i], 0);
-                if (outputBlock.hasRoomFor(currentTuple)){
-                    outputBlock.addTuple(currentTuple);
-                } else {
-                    for (Tuple t : outputBlock.iterator())
-                    sm.writeBlock(outputBlock);
-                    ou
-                    outputBlock.addTuple(currentTuple);
-                }
-                outputBuffer.putBlock(outputBlock);
-
-            }*/
-            Block outputBuffer = new Block(inRelation, outputFileName, 0);
-            Block[] inputBuffers = new Block[num_runs];
-            int[] blockIdInRunFile = new int[num_runs];
-            int[] tupleIdInBlockInRunFile = new int[num_runs];
-            int outputLasBlock = 0;
-
-            for (int r = 0; r < num_runs; r++) {
-                try {
-                    inputBuffers[r] = sm.readBlock(inRelation, runTempFiles[r], 0);
-                    blockIdInRunFile[r] = 0;
-                    tupleIdInBlockInRunFile[r] = 0;
-                } catch (DBxicException e) {
-                    blockIdInRunFile[r] = -1;
-                    tupleIdInBlockInRunFile[r] = -1;
-                    throw e;
-                }
-            }
-
-            boolean allBuffersEmpty = false;
-            while (!allBuffersEmpty){
-                // 3.1
-                Tuple currentTuple = null;
-                int r = 0;
-                int i = 0;
-                while (r < num_runs){
-                    Tuple newTuple  = inputBuffers[r].getTuple(tupleIdInBlockInRunFile[r]);
-                    if (currentTuple == null || compareTuples(currentTuple, newTuple) > 0) {
-                        currentTuple = newTuple;
-                        i = r;
-                    }
-                    r++;
-                }
-                // 3.2
-                //inputBuffers[i].tuples.remove(t);
-                // 3.3
-                if (!outputBuffer.hasRoomFor(currentTuple)) {
-                    for (Tuple t : outputBuffer) {
-                        sm.insertTuple(inRelation, outputFileName, t);
-                    }
-                    /*RandomAccessFile raf = new RandomAccessFile(outputFileName, FileHandling.READ_WRITE);
-                    BlockIOManager.writeBlock(raf, outputBuffer);
-                    raf.close();*/
-                    outputLasBlock++;
-                    outputBuffer = new Block(inRelation, outputFileName, outputLasBlock);
-                }
-                outputBuffer.addTuple(currentTuple);
-
-                // 3.4
-                /*if (inputBuffers[i].isEmpty()){
-                    inputBuffers[i] = sm.readBlock(inRelation, runTempFiles[r], blockIdInRunFile[i]);
-                }*/
+            Iterator<Tuple> it = tuplesFromRuns(runTempRelations, runTempFiles);
+            while(it.hasNext()) {
+                sm.insertTuple(getOutputRelation(), outputFileName, it.next());
             }
 
             outputTuples = sm.tuples(getOutputRelation(), outputFileName).iterator();

@@ -72,12 +72,27 @@ public class MergeJoin extends BasicJoinOperator {
             /////////////////////////////////////////////////////////
 
             // get next output tuple from left operator
+            leftTuple = getInputOperator(LEFT).getNextOutTuple();
             // get next set of output tuples from right operator (if necessary)
-            // if the value of the join attribute is equal in tuples from both input operators:
-            //    combine tuples
-            // else
-            //    get more tuples from the corresponding input operator
+            if (lastRightTuple == null)
+                rightSetOfTuples = getNextRightSetOfTuples();
 
+            while (returnList.isEmpty() && !leftTuple.isClosing() && !rightSetOfTuples.isEmpty()) {
+                Comparable leftValue = leftTuple.getValue(leftSlot);
+                Comparable rightValue = rightSetOfTuples.get(0).getValue(rightSlot);
+                // if the value of the join attribute is equal in tuples from both input operators: combine tuples
+                if (leftValue.equals(rightValue)){
+                    for (Tuple rightTuple: rightSetOfTuples)
+                        returnList.add(combineTuples(leftTuple, rightTuple));
+                } else {
+                    // get more tuples from the corresponding input operator
+                    if (leftValue.compareTo(rightValue) > 0){
+                        rightSetOfTuples = getNextRightSetOfTuples();
+                    } else if (leftValue.compareTo(rightValue) < 0){
+                        leftTuple = getInputOperator(LEFT).getNextOutTuple();
+                    }
+                }
+            }
 
             if (returnList.isEmpty()) returnList.add(new Tuple(Tuple.tupleType.CLOSING));
             return returnList;

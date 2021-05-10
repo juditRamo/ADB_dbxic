@@ -531,7 +531,7 @@ public class PlanBuilder {
             throws DBxicException {
         try {
             Predicate pred = null;
-            boolean useFastJoin = false;
+            boolean useFastJoin = true;
             
             if (joins.size() == 1) {
                 Join join = joins.get(0);
@@ -547,8 +547,8 @@ public class PlanBuilder {
             }
 
             // comment the next line and uncomment the rest when you have implemented your solution for Merge Join
-            return new NestedLoopsJoin(leftOp, rightOp, sm, pred);
-            /*if (! useFastJoin) {
+            //return new NestedLoopsJoin(leftOp, rightOp, sm, pred);
+            if (! useFastJoin) {
                 return new NestedLoopsJoin(leftOp, rightOp, sm, pred);
             }
             else {
@@ -577,16 +577,16 @@ public class PlanBuilder {
                 rightSlots[0] = rightTsp.getSlot();
 
                 int num_runs = sm.getNumberOfBlocksInBuffer() / 2;
-                num_runs = 5; //TODO: This is just a test. We should use something more intelligent... num_runs > 10 ? num_runs : 10
+                num_runs =  Math.max(num_runs, 10);
 
                 // We need to provide sorted input relations to MergeJoin
-                PhysicalOperator orderedLeftOp = ...;
-                PhysicalOperator orderedRightOp = ...;
+                PhysicalOperator orderedLeftOp = new ExternalSort(leftOp, sm, leftSlots, num_runs);
+                PhysicalOperator orderedRightOp = new ExternalSort(rightOp, sm, rightSlots, num_runs);
                 // create the Merge Join operation with the sorting operations pipelined
                 return new MergeJoin(orderedLeftOp, orderedRightOp, sm, leftSlots[0], rightSlots[0],
                         createJoinPredicate(orderedLeftOp, orderedRightOp, join));
 
-            }*/
+            }
         }
         catch (DBxicException ee) {
             throw new DBxicException("Could not instantiate physical join", ee);
@@ -659,8 +659,8 @@ public class PlanBuilder {
      */
     protected PhysicalOperator pipeSorts(List<Sort> sorts, PhysicalOperator physicalOperator) throws DBxicException {
         // comment the next line and uncomment the rest when you have implemented your solution for External Sort
-        return physicalOperator;
-        /*try {
+        //return physicalOperator;
+        try {
             if (sorts.size() > 1) {
                 throw new DBxicException("Error: Only one sort clause allowed.");
             }
@@ -669,8 +669,8 @@ public class PlanBuilder {
                 int [] slots = listOfVariablesToArrayOfSlots(sort.getSortList(), physicalOperator.getOutputRelation());
 
                 int num_runs = sm.getNumberOfBlocksInBuffer() / 2;
-                num_runs = 5; //TODO: This is just a test. We should use something more intelligent... num_runs > 10 ? num_runs : 10
-                PhysicalOperator newOperator = ...;
+                num_runs = Math.max(num_runs, 10);
+                PhysicalOperator newOperator = new ExternalSort(physicalOperator, sm, slots, num_runs);
                 return newOperator;
             }
             else {
@@ -679,7 +679,7 @@ public class PlanBuilder {
         }
         catch (DBxicException ee) {
             throw new DBxicException("Error: Couldn't instantiate final sort.", ee);
-        }*/
+        }
     } // pipeSorts
 
     /**
